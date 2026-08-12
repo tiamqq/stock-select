@@ -653,23 +653,45 @@ msg.set_content(
 
 
 # ============================================================
-# 11. 添加 CSV 附件
+# 11. 添加所有 CSV 附件
 # ============================================================
 
-with open(
-    output_file,
-    "rb"
-) as f:
+csv_files = [
+    "tickflow_filtered_symbol.csv",
+    "tickflow_2_all_day.csv",
+    "tickflow_3_day.csv",
+    "tickflow_4_final.csv"
+]
 
-    file_data = f.read()
+
+for csv_file in csv_files:
+
+    if not os.path.exists(csv_file):
+        print(
+            f"警告：文件不存在，跳过附件：{csv_file}"
+        )
+        continue
 
 
-msg.add_attachment(
-    file_data,
-    maintype="text",
-    subtype="csv",
-    filename=output_file
-)
+    with open(
+        csv_file,
+        "rb"
+    ) as f:
+
+        file_data = f.read()
+
+
+    msg.add_attachment(
+        file_data,
+        maintype="text",
+        subtype="csv",
+        filename=csv_file
+    )
+
+
+    print(
+        f"已添加附件：{csv_file}"
+    )
 
 
 # ============================================================
