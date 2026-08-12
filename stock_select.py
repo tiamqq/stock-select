@@ -37,7 +37,7 @@ SMTP_PORT = 587
 # ============================================================
 
 tf = TickFlow(
-    api_key=API_KEY
+api_key=API_KEY
 )
 
 tf_free = TickFlow.free()
@@ -54,21 +54,21 @@ url = "https://api.tickflow.org/v1/universes/batch"
 
 
 payload = {
-    "ids": ["CN_Equity_A"]
+"ids": ["CN_Equity_A"]
 }
 
 
 headers = {
-    "x-api-key": API_KEY,
-    "Content-Type": "application/json"
+"x-api-key": API_KEY,
+"Content-Type": "application/json"
 }
 
 
 resp = requests.post(
-    url,
-    json=payload,
-    headers=headers,
-    timeout=60
+url,
+json=payload,
+headers=headers,
+timeout=60
 )
 
 
@@ -82,7 +82,7 @@ symbols = data["data"]["CN_Equity_A"]["symbols"]
 
 
 df = pd.DataFrame({
-    "symbol": symbols
+"symbol": symbols
 })
 
 
@@ -94,20 +94,20 @@ df = pd.DataFrame({
 # ============================================================
 
 df = df[
-    ~df["symbol"].str.endswith(".BJ")
-    & ~df["symbol"].str.startswith(("688", "689"))
+~df["symbol"].str.endswith(".BJ")
+& ~df["symbol"].str.startswith(("688", "689"))
 ].copy()
 
 
 df.to_csv(
-    "tickflow_filtered_symbol.csv",
-    index=False,
-    encoding="utf-8-sig"
+"tickflow_filtered_symbol.csv",
+index=False,
+encoding="utf-8-sig"
 )
 
 
 print(
-    f"过滤后剩余 {len(df)} 条股票"
+f"过滤后剩余 {len(df)} 条股票"
 )
 
 
@@ -116,18 +116,17 @@ print(
 # ============================================================
 
 df_symbol = pd.read_csv(
-    "tickflow_filtered_symbol.csv"
+"tickflow_filtered_symbol.csv"
 )
 
 
 symbol_list = df_symbol[
-    "symbol"
+"symbol"
 ].tolist()
 
 
 print("股票列表读取完成")
 print("开始获取数据...")
-
 
 
 # ============================================================
@@ -136,215 +135,75 @@ print("开始获取数据...")
 
 all_data = []
 
-# 记录实际成功获取到数据的股票
-success_symbols = set()
-
 batch_size = 200
 
 
 for i in range(
-    0,
-    len(symbol_list),
-    batch_size
+0,
+len(symbol_list),
+batch_size
 ):
 
-    batch_sym = symbol_list[
-        i:i + batch_size
-    ]
-
-    print(
-        f"正在处理 "
-        f"{i + 1} ~ "
-        f"{i + len(batch_sym)} / {len(symbol_list)}"
-    )
-
-    try:
-
-        dfs = tf_free.klines.batch(
-            batch_sym,
-            period="1d",
-            count=20,
-            as_dataframe=True,
-            show_progress=True
-        )
-
-        for sym, df_k in dfs.items():
-
-            if df_k is None:
-                continue
-
-            if len(df_k) == 0:
-                continue
-
-            df_k = df_k.copy()
-
-            df_k["symbol"] = sym
-
-            all_data.append(df_k)
-
-            success_symbols.add(sym)
-
-    except Exception as e:
-
-        print(
-            f"这一批获取失败："
-            f"{i + 1} ~ {i + len(batch_sym)}"
-        )
-
-        print(
-            f"错误：{e}"
-        )
-
-    # 避免接口限流
-    time.sleep(0.8)
-
-
-# ============================================================
-# 4.1 检查有没有股票没有获取到数据
-# ============================================================
-
-success_symbols = set(success_symbols)
-
-missing_symbols = [
-    sym
-    for sym in symbol_list
-    if sym not in success_symbols
+batch_sym = symbol_list[
+i:i + batch_size
 ]
 
 
 print(
-    f"批量获取完成："
-    f"成功 {len(success_symbols)} 只，"
-    f"缺失 {len(missing_symbols)} 只"
+f"正在处理 "
+f"{i + 1} ~ "
+f"{i + len(batch_sym)} / "
+f"{len(symbol_list)}"
 )
 
 
-# ============================================================
-# 4.2 对缺失股票重新单独获取
-# ============================================================
+try:
 
-if missing_symbols:
-
-    print(
-        f"开始重新获取缺失股票："
-        f"{len(missing_symbols)} 只"
-    )
-
-    retry_success = 0
-
-    retry_failed = []
+dfs = tf_free.klines.batch(
+batch_sym,
+period="1d",
+count=20,
+as_dataframe=True,
+show_progress=True
+)
 
 
-    for index, sym in enumerate(
-        missing_symbols,
-        start=1
-    ):
+for sym, df_k in dfs.items():
 
-        print(
-            f"重新获取 "
-            f"{index}/{len(missing_symbols)}："
-            f"{sym}"
-        )
+if df_k is None:
+continue
 
 
-        try:
-
-            retry_dfs = tf_free.klines.batch(
-                [sym],
-                period="1d",
-                count=20,
-                as_dataframe=True,
-                show_progress=False
-            )
+if len(df_k) == 0:
+continue
 
 
-            df_k = retry_dfs.get(sym)
+df_k = df_k.copy()
 
 
-            if (
-                df_k is not None
-                and len(df_k) > 0
-            ):
-
-                df_k = df_k.copy()
-
-                df_k["symbol"] = sym
-
-                all_data.append(df_k)
-
-                success_symbols.add(sym)
-
-                retry_success += 1
-
-                print(
-                    f"  ✓ 获取成功：{sym}"
-                )
-
-            else:
-
-                retry_failed.append(sym)
-
-                print(
-                    f"  ✗ 仍然没有数据：{sym}"
-                )
+df_k["symbol"] = sym
 
 
-        except Exception as e:
-
-            retry_failed.append(sym)
-
-            print(
-                f"  ✗ 获取失败："
-                f"{sym}，错误：{e}"
-            )
+all_data.append(
+df_k
+)
 
 
-        # 防止请求过快
-        time.sleep(0.5)
-
-
-    print(
-        f"缺失股票重新获取完成："
-        f"成功 {retry_success} 只，"
-        f"仍失败 {len(retry_failed)} 只"
-    )
-
-
-    if retry_failed:
-
-        print(
-            "以下股票最终仍没有获取到数据："
-        )
-
-        print(
-            retry_failed
-        )
-
-
-# ============================================================
-# 4.3 最终统计
-# ============================================================
+except Exception as e:
 
 print(
-    "================================"
+f"这一批获取失败："
+f"{i + 1} ~ "
+f"{i + len(batch_sym)}"
 )
 
 print(
-    f"股票列表总数：{len(symbol_list)}"
+f"错误：{e}"
 )
 
-print(
-    f"最终成功获取：{len(success_symbols)}"
-)
 
-print(
-    f"最终没有数据："
-    f"{len(symbol_list) - len(success_symbols)}"
-)
-
-print(
-    "================================"
-)
+# 避免接口限流
+time.sleep(0.8)
 
 
 # ============================================================
@@ -353,30 +212,29 @@ print(
 
 if not all_data:
 
-    raise RuntimeError(
-        "没有获取到任何股票日线数据，程序终止。"
-    )
+raise RuntimeError(
+"没有获取到任何股票日线数据，程序终止。"
+)
 
 
 big_df = pd.concat(
-    all_data,
-    axis=0,
-    ignore_index=True
+all_data,
+axis=0,
+ignore_index=True
 )
 
 
 big_df.to_csv(
-    "tickflow_2_all_day.csv",
-    index=False,
-    encoding="utf-8-sig"
+"tickflow_2_all_day.csv",
+index=False,
+encoding="utf-8-sig"
 )
 
 
 print(
-    f"日线数据获取完成，"
-    f"总行数：{len(big_df)}"
+f"日线数据获取完成，"
+f"总行数：{len(big_df)}"
 )
-
 
 
 # ============================================================
@@ -384,60 +242,60 @@ print(
 # ============================================================
 
 df = pd.read_csv(
-    "tickflow_2_all_day.csv"
+"tickflow_2_all_day.csv"
 )
 
 
 df["trade_date"] = pd.to_datetime(
-    df["trade_date"]
+df["trade_date"]
 )
 
 
 df = df.sort_values(
-    by=[
-        "symbol",
-        "trade_date"
-    ]
+by=[
+"symbol",
+"trade_date"
+]
 ).reset_index(
-    drop=True
+drop=True
 )
 
 
 # 前一天收盘价
 df["prev_close"] = (
-    df.groupby("symbol")[
-        "close"
-    ].shift(1)
+df.groupby("symbol")[
+"close"
+].shift(1)
 )
 
 
 # 涨跌幅
 df["pct_change"] = (
-    df["close"]
-    / df["prev_close"]
-    - 1
+df["close"]
+/ df["prev_close"]
+- 1
 ) * 100
 
 
 # 删除辅助列
 df.drop(
-    columns=["prev_close"],
-    inplace=True
+columns=["prev_close"],
+inplace=True
 )
 
 
 # 调整列顺序
 cols = [
-    "symbol",
-    "name",
-    "trade_date",
-    "open",
-    "high",
-    "low",
-    "close",
-    "pct_change",
-    "volume",
-    "amount"
+"symbol",
+"name",
+"trade_date",
+"open",
+"high",
+"low",
+"close",
+"pct_change",
+"volume",
+"amount"
 ]
 
 
@@ -445,9 +303,9 @@ df = df[cols]
 
 
 df.to_csv(
-    "tickflow_3_day.csv",
-    index=False,
-    encoding="utf-8-sig"
+"tickflow_3_day.csv",
+index=False,
+encoding="utf-8-sig"
 )
 
 
@@ -459,30 +317,30 @@ print("涨跌幅计算完成")
 # ============================================================
 
 df = pd.read_csv(
-    "tickflow_3_day.csv",
-    encoding="utf-8-sig"
+"tickflow_3_day.csv",
+encoding="utf-8-sig"
 )
 
 
 df["trade_date"] = pd.to_datetime(
-    df["trade_date"]
+df["trade_date"]
 )
 
 
 df = df.sort_values(
-    by=[
-        "symbol",
-        "trade_date"
-    ],
-    ascending=True
+by=[
+"symbol",
+"trade_date"
+],
+ascending=True
 ).reset_index(
-    drop=True
+drop=True
 )
 
 
 # 删除没有涨跌幅的数据
 df = df.dropna(
-    subset=["pct_change"]
+subset=["pct_change"]
 )
 
 
@@ -491,10 +349,10 @@ df = df.dropna(
 # ============================================================
 
 df = df[
-    ~df["name"].str.contains(
-        "ST|退",
-        na=False
-    )
+~df["name"].str.contains(
+"ST|退",
+na=False
+)
 ].copy()
 
 
@@ -515,56 +373,56 @@ hit_symbols = set()
 
 
 for symbol, group in df.groupby(
-    "symbol"
+"symbol"
 ):
 
-    g = group.sort_values(
-        "trade_date"
-    ).reset_index(
-        drop=True
-    )
+g = group.sort_values(
+"trade_date"
+).reset_index(
+drop=True
+)
 
 
-    if len(g) < 8:
-        continue
+if len(g) < 8:
+continue
 
 
-    last8 = g.tail(8)
+last8 = g.tail(8)
 
-    last3 = g.tail(3)
+last3 = g.tail(3)
 
-    latest_row = g.iloc[-1]
+latest_row = g.iloc[-1]
 
-    prev_row = g.iloc[-2]
-
-
-    # 条件1
-    has_big_drop_8d = (
-        last8["pct_change"] <= -9.5
-    ).any()
+prev_row = g.iloc[-2]
 
 
-    # 条件2
-    no_big_drop_3d = (
-        last3["pct_change"] > -5.0
-    ).all()
+# 条件1
+has_big_drop_8d = (
+last8["pct_change"] <= -9.5
+).any()
 
 
-    # 条件3
-    price_ok = (
-        latest_row["close"] < 30
-    )
+# 条件2
+no_big_drop_3d = (
+last3["pct_change"] > -5.0
+).all()
 
 
-    if (
-        has_big_drop_8d
-        and no_big_drop_3d
-        and price_ok
-    ):
+# 条件3
+price_ok = (
+latest_row["close"] < 30
+)
 
-        hit_symbols.add(
-            symbol
-        )
+
+if (
+has_big_drop_8d
+and no_big_drop_3d
+and price_ok
+):
+
+hit_symbols.add(
+symbol
+)
 
 
 # ============================================================
@@ -576,75 +434,75 @@ output_file = "tickflow_4_final.csv"
 
 if hit_symbols:
 
-    out_df = df[
-        df["symbol"].isin(
-            hit_symbols
-        )
-    ].copy()
+out_df = df[
+df["symbol"].isin(
+hit_symbols
+)
+].copy()
 
 
-    cols = [
-        "symbol",
-        "name",
-        "trade_date",
-        "open",
-        "high",
-        "low",
-        "close",
-        "pct_change",
-        "volume",
-        "amount"
-    ]
+cols = [
+"symbol",
+"name",
+"trade_date",
+"open",
+"high",
+"low",
+"close",
+"pct_change",
+"volume",
+"amount"
+]
 
 
-    out_df = out_df[cols]
+out_df = out_df[cols]
 
 
-    out_df.to_csv(
-        output_file,
-        index=False,
-        encoding="utf-8-sig"
-    )
+out_df.to_csv(
+output_file,
+index=False,
+encoding="utf-8-sig"
+)
 
 
-    print(
-        f"一共筛选 "
-        f"{len(hit_symbols)} 只股票，"
-        f"总输出 {len(out_df)} 行 K 线记录"
-    )
+print(
+f"一共筛选 "
+f"{len(hit_symbols)} 只股票，"
+f"总输出 {len(out_df)} 行 K 线记录"
+)
 
 
 else:
 
-    # 没有符合条件股票
-    # 仍然生成空 CSV
+# 没有符合条件股票
+# 仍然生成空 CSV
 
-    out_df = pd.DataFrame(
-        columns=[
-            "symbol",
-            "name",
-            "trade_date",
-            "open",
-            "high",
-            "low",
-            "close",
-            "pct_change",
-            "volume",
-            "amount"
-        ]
-    )
-
-
-    out_df.to_csv(
-        output_file,
-        index=False,
-        encoding="utf-8-sig"
-    )
+out_df = pd.DataFrame(
+columns=[
+"symbol",
+"name",
+"trade_date",
+"open",
+"high",
+"low",
+"close",
+"pct_change",
+"volume",
+"amount"
+]
+)
 
 
-    print(
-        "没有符合条件股票"
-    )
+out_df.to_csv(
+output_file,
+index=False,
+encoding="utf-8-sig"
+)
+
+
+print(
+"没有符合条件股票"
+)
 
 
 # ============================================================
@@ -652,59 +510,59 @@ else:
 # ============================================================
 
 today = datetime.now().strftime(
-    "%Y-%m-%d"
+"%Y-%m-%d"
 )
 
 
 if hit_symbols:
 
-    # 获取最新交易日
-    latest_date = df[
-        "trade_date"
-    ].max()
+# 获取最新交易日
+latest_date = df[
+"trade_date"
+].max()
 
 
-    # 获取当天选中的股票
-    latest_selected = df[
-        (df["symbol"].isin(hit_symbols))
-        &
-        (df["trade_date"] == latest_date)
-    ].copy()
+# 获取当天选中的股票
+latest_selected = df[
+(df["symbol"].isin(hit_symbols))
+&
+(df["trade_date"] == latest_date)
+].copy()
 
 
-    latest_selected = latest_selected.sort_values(
-        "symbol"
-    )
+latest_selected = latest_selected.sort_values(
+"symbol"
+)
 
 
-    stock_lines = []
+stock_lines = []
 
 
-    for _, row in latest_selected.iterrows():
+for _, row in latest_selected.iterrows():
 
-        symbol = row["symbol"]
+symbol = row["symbol"]
 
-        name = row["name"]
+name = row["name"]
 
-        close = row["close"]
+close = row["close"]
 
-        pct = row["pct_change"]
-
-
-        stock_lines.append(
-            f"{symbol}  "
-            f"{name}  "
-            f"收盘价：{close:.2f}  "
-            f"涨跌幅：{pct:.2f}%"
-        )
+pct = row["pct_change"]
 
 
-    stock_text = "\n".join(
-        stock_lines
-    )
+stock_lines.append(
+f"{symbol}  "
+f"{name}  "
+f"收盘价：{close:.2f}  "
+f"涨跌幅：{pct:.2f}%"
+)
 
 
-    body = f"""\
+stock_text = "\n".join(
+stock_lines
+)
+
+
+body = f"""\
 A股今日选股完成。
 
 日期：{today}
@@ -736,7 +594,7 @@ A股今日选股完成。
 
 else:
 
-    body = f"""\
+body = f"""\
 A股今日选股完成。
 
 日期：{today}
@@ -771,17 +629,17 @@ msg = EmailMessage()
 
 if hit_symbols:
 
-    msg["Subject"] = (
-        f"【A股选股】{today} "
-        f"共 {len(hit_symbols)} 只"
-    )
+msg["Subject"] = (
+f"【A股选股】{today} "
+f"共 {len(hit_symbols)} 只"
+)
 
 else:
 
-    msg["Subject"] = (
-        f"【A股选股】{today} "
-        f"无符合条件股票"
-    )
+msg["Subject"] = (
+f"【A股选股】{today} "
+f"无符合条件股票"
+)
 
 
 msg["From"] = SENDER_EMAIL
@@ -790,7 +648,7 @@ msg["To"] = RECEIVER_EMAIL
 
 
 msg.set_content(
-    body
+body
 )
 
 
@@ -799,39 +657,41 @@ msg.set_content(
 # ============================================================
 
 csv_files = [
-    "tickflow_3_day.csv",
-    "tickflow_4_final.csv"
+    "tickflow_filtered_symbol.csv",
+    "tickflow_2_all_day.csv",
+"tickflow_3_day.csv",
+"tickflow_4_final.csv"
 ]
 
 
 for csv_file in csv_files:
 
-    if not os.path.exists(csv_file):
-        print(
-            f"警告：文件不存在，跳过附件：{csv_file}"
-        )
-        continue
+if not os.path.exists(csv_file):
+print(
+f"警告：文件不存在，跳过附件：{csv_file}"
+)
+continue
 
 
-    with open(
-        csv_file,
-        "rb"
-    ) as f:
+with open(
+csv_file,
+"rb"
+) as f:
 
-        file_data = f.read()
-
-
-    msg.add_attachment(
-        file_data,
-        maintype="text",
-        subtype="csv",
-        filename=csv_file
-    )
+file_data = f.read()
 
 
-    print(
-        f"已添加附件：{csv_file}"
-    )
+msg.add_attachment(
+file_data,
+maintype="text",
+subtype="csv",
+filename=csv_file
+)
+
+
+print(
+f"已添加附件：{csv_file}"
+)
 
 
 # ============================================================
@@ -842,24 +702,24 @@ print("正在发送邮件...")
 
 
 with smtplib.SMTP(
-    SMTP_SERVER,
-    SMTP_PORT,
-    timeout=60
+SMTP_SERVER,
+SMTP_PORT,
+timeout=60
 ) as server:
 
-    # STARTTLS
-    server.starttls()
+# STARTTLS
+server.starttls()
 
-    # 登录 QQ 邮箱
-    server.login(
-        SENDER_EMAIL,
-        SMTP_PASSWORD
-    )
+# 登录 QQ 邮箱
+server.login(
+SENDER_EMAIL,
+SMTP_PASSWORD
+)
 
-    # 发送邮件
-    server.send_message(
-        msg
-    )
+# 发送邮件
+server.send_message(
+msg
+)
 
 
 print("==============================")
