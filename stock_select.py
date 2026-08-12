@@ -657,8 +657,6 @@ msg.set_content(
 # ============================================================
 
 csv_files = [
-    "tickflow_filtered_symbol.csv",
-    "tickflow_2_all_day.csv",
     "tickflow_3_day.csv",
     "tickflow_4_final.csv"
 ]
