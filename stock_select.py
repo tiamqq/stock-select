@@ -129,11 +129,15 @@ print("股票列表读取完成")
 print("开始获取数据...")
 
 
+
 # ============================================================
 # 4. 批量获取最近 20 根日线
 # ============================================================
 
 all_data = []
+
+# 记录实际成功获取到数据的股票
+success_symbols = set()
 
 batch_size = 200
 
@@ -148,14 +152,11 @@ for i in range(
         i:i + batch_size
     ]
 
-
     print(
         f"正在处理 "
         f"{i + 1} ~ "
-        f"{i + len(batch_sym)} / "
-        f"{len(symbol_list)}"
+        f"{i + len(batch_sym)} / {len(symbol_list)}"
     )
-
 
     try:
 
@@ -167,43 +168,183 @@ for i in range(
             show_progress=True
         )
 
-
         for sym, df_k in dfs.items():
 
             if df_k is None:
                 continue
 
-
             if len(df_k) == 0:
                 continue
 
-
             df_k = df_k.copy()
-
 
             df_k["symbol"] = sym
 
+            all_data.append(df_k)
 
-            all_data.append(
-                df_k
-            )
-
+            success_symbols.add(sym)
 
     except Exception as e:
 
         print(
             f"这一批获取失败："
-            f"{i + 1} ~ "
-            f"{i + len(batch_sym)}"
+            f"{i + 1} ~ {i + len(batch_sym)}"
         )
 
         print(
             f"错误：{e}"
         )
 
-
     # 避免接口限流
     time.sleep(0.8)
+
+
+# ============================================================
+# 4.1 检查有没有股票没有获取到数据
+# ============================================================
+
+success_symbols = set(success_symbols)
+
+missing_symbols = [
+    sym
+    for sym in symbol_list
+    if sym not in success_symbols
+]
+
+
+print(
+    f"批量获取完成："
+    f"成功 {len(success_symbols)} 只，"
+    f"缺失 {len(missing_symbols)} 只"
+)
+
+
+# ============================================================
+# 4.2 对缺失股票重新单独获取
+# ============================================================
+
+if missing_symbols:
+
+    print(
+        f"开始重新获取缺失股票："
+        f"{len(missing_symbols)} 只"
+    )
+
+    retry_success = 0
+
+    retry_failed = []
+
+
+    for index, sym in enumerate(
+        missing_symbols,
+        start=1
+    ):
+
+        print(
+            f"重新获取 "
+            f"{index}/{len(missing_symbols)}："
+            f"{sym}"
+        )
+
+
+        try:
+
+            retry_dfs = tf_free.klines.batch(
+                [sym],
+                period="1d",
+                count=20,
+                as_dataframe=True,
+                show_progress=False
+            )
+
+
+            df_k = retry_dfs.get(sym)
+
+
+            if (
+                df_k is not None
+                and len(df_k) > 0
+            ):
+
+                df_k = df_k.copy()
+
+                df_k["symbol"] = sym
+
+                all_data.append(df_k)
+
+                success_symbols.add(sym)
+
+                retry_success += 1
+
+                print(
+                    f"  ✓ 获取成功：{sym}"
+                )
+
+            else:
+
+                retry_failed.append(sym)
+
+                print(
+                    f"  ✗ 仍然没有数据：{sym}"
+                )
+
+
+        except Exception as e:
+
+            retry_failed.append(sym)
+
+            print(
+                f"  ✗ 获取失败："
+                f"{sym}，错误：{e}"
+            )
+
+
+        # 防止请求过快
+        time.sleep(0.5)
+
+
+    print(
+        f"缺失股票重新获取完成："
+        f"成功 {retry_success} 只，"
+        f"仍失败 {len(retry_failed)} 只"
+    )
+
+
+    if retry_failed:
+
+        print(
+            "以下股票最终仍没有获取到数据："
+        )
+
+        print(
+            retry_failed
+        )
+
+
+# ============================================================
+# 4.3 最终统计
+# ============================================================
+
+print(
+    "================================"
+)
+
+print(
+    f"股票列表总数：{len(symbol_list)}"
+)
+
+print(
+    f"最终成功获取：{len(success_symbols)}"
+)
+
+print(
+    f"最终没有数据："
+    f"{len(symbol_list) - len(success_symbols)}"
+)
+
+print(
+    "================================"
+)
 
 
 # ============================================================
@@ -235,6 +376,7 @@ print(
     f"日线数据获取完成，"
     f"总行数：{len(big_df)}"
 )
+
 
 
 # ============================================================
