@@ -39,6 +39,7 @@ attachments = [
     "tickflow_4_final.csv",
     "trend_result.csv",
     "trend_top30.csv",
+    "low_base_top30.csv"
 ]
 
 
@@ -66,7 +67,7 @@ A股自动选股结果
 
 日期：{today}
 
-本次运行包含两个独立策略：
+本次运行包含三个独立策略：
 
 【策略1】
 原有短线选股策略
@@ -75,12 +76,17 @@ A股自动选股结果
 【策略2】
 趋势评分策略
 附件：trend_result.csv
+重点观察：trend_top30.csv
 
-【策略2重点观察】
-趋势评分最高30只股票
-附件：trend_top30.csv
+【策略3】
+低位震荡蓄势策略
+附件：low_base_result.csv
+重点观察：low_base_top30.csv
 
 请人工进一步筛选。
+请人工进一步筛选。
+请人工进一步筛选。
+
 
 此邮件由 GitHub Actions 自动发送。
 """
