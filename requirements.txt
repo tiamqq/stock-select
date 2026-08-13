@@ -2,3 +2,4 @@ tickflow
 pandas
 tqdm
 requests
+numpy
