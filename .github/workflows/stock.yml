@@ -42,3 +42,11 @@ jobs:
 
         run: |
           python stock_select.py
+          
+      - name: Run trend strategy
+        run: |
+          python trend_strategy.py
+
+
+
+          
