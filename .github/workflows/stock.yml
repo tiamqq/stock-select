@@ -2,7 +2,7 @@ name: A股自动选股
 
 on:
   schedule:
-    # 周一到周五，北京时间 19:20
+    # 周一到周五，北京时间 19:17
     # GitHub Actions 使用 UTC
     - cron: "20 11 * * 1-5"
 
