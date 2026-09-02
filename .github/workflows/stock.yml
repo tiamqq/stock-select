@@ -4,7 +4,7 @@ on:
   schedule:
     # 周一到周五，北京时间 19:17
     # GitHub Actions 使用 UTC
-    - cron: "20 11 * * 1-5"
+    - cron: "17 11 * * 1-5"
 
   # 允许在 GitHub 页面手动运行
   workflow_dispatch:
